@@ -100,7 +100,7 @@ function SystemGateway() {
   // Set default active tab automatically whenever the user role is logged in/changed
   React.useEffect(() => {
     if (user) {
-      setActiveTab(user.role === "admin" ? "dashboard" : "purchase_products");
+      setActiveTab(user.role === "admin" ? "dashboard" : "profile");
     }
   }, [user?.role]);
 

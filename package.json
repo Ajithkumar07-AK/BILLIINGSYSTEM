@@ -21,7 +21,6 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
     "mongodb": "^7.3.0",
-    "mongodb-memory-server": "^11.2.0",
     "motion": "^12.23.24",
     "nodemailer": "^9.0.1",
     "react": "^19.0.1",

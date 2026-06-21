@@ -141,13 +141,312 @@ export default function AdminPurchases() {
     printWindow.document.close();
   };
 
-  const downloadJSONInvoice = (p: Purchase) => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(p, null, 2));
+  const downloadHTMLInvoice = (p: Purchase) => {
+    const subtotal = parseFloat((p.totalAmount / 1.18).toFixed(2));
+    const gstVal = parseFloat((p.totalAmount - subtotal).toFixed(2));
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Supermarket Bill - ${p.id}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+    
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #f8fafc;
+      margin: 0;
+      padding: 40px 20px;
+      color: #1e293b;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .ctrl-bar {
+      max-width: 800px;
+      margin: 0 auto 24px auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      padding: 12px 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+      border: 1px solid #e2e8f0;
+    }
+    .ctrl-btn {
+      background-color: #059669;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.2s;
+    }
+    .ctrl-btn:hover {
+      background-color: #047857;
+    }
+    .ctrl-info {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .receipt-card {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 48px;
+      border-radius: 20px;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+      border: 1px solid #e2e8f0;
+      box-sizing: border-box;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #059669;
+      margin: 0 0 6px 0;
+    }
+    .header p {
+      font-size: 12px;
+      color: #64748b;
+      margin: 0;
+      font-weight: 500;
+    }
+
+    .divider {
+      border-top: 1px dashed #cbd5e1;
+      margin: 24px 0;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      font-size: 12px;
+      margin-bottom: 36px;
+    }
+    .meta-col {
+      line-height: 1.6;
+    }
+    .meta-col.right {
+      text-align: right;
+    }
+    .meta-title {
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      font-size: 11px;
+    }
+    .meta-value {
+      color: #334155;
+      font-size: 12px;
+    }
+    .meta-val-bold {
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 24px;
+    }
+    .items-table th {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 12px 0;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #64748b;
+      text-align: left;
+      letter-spacing: 0.05em;
+    }
+    .items-table td {
+      padding: 16px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+    }
+    .items-table .product-name {
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .items-table .category {
+      color: #64748b;
+    }
+    .items-table .price {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .items-table .qty {
+      font-weight: 700;
+      text-align: center;
+    }
+    .items-table .amount {
+      font-weight: 700;
+      color: #0f172a;
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .summary-section {
+      margin-top: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .summary-table {
+      width: 320px;
+      border-collapse: collapse;
+    }
+    .summary-table td {
+      padding: 6px 0;
+      font-size: 13px;
+      color: #475569;
+    }
+    .summary-table .amount-val {
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 500;
+    }
+    .summary-table .total-row td {
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      font-weight: 800;
+      color: #059669;
+      font-size: 15px;
+    }
+    .summary-table .total-row .total-val {
+      font-size: 16px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 60px;
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    @media print {
+      body {
+        background-color: white;
+        padding: 0;
+      }
+      .ctrl-bar {
+        display: none !important;
+      }
+      .receipt-card {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="ctrl-bar">
+    <div class="ctrl-info">
+      🏪 AR Supermarket Digital Bill Document (HTML Format ready to Print/PDF)
+    </div>
+    <button class="ctrl-btn" onclick="window.print()">
+      Print Receipt / Save PDF
+    </button>
+  </div>
+
+  <div class="receipt-card">
+    <div class="header">
+      <h1>🏪 AR SUPERMARKET INDIA LTD.</h1>
+      <p>Connaught Place Plaza, New Delhi - 110001</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="meta-grid">
+      <div class="meta-col">
+        <div class="meta-title">Billed To:</div>
+        <div class="meta-value meta-val-bold">${p.customerName}</div>
+        <div class="meta-value">Email: ${p.customerEmail}</div>
+        <div class="meta-value">Mobile: +91 ${p.customerMobile}</div>
+      </div>
+      <div class="meta-col right">
+        <div class="meta-title">Invoice Reference:</div>
+        <div class="meta-value">Invoice ID: <span class="meta-val-bold" style="font-family: 'JetBrains Mono', monospace;">#${p.id}</span></div>
+        <div class="meta-value">Date: ${p.purchaseDate}</div>
+      </div>
+    </div>
+
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width: 45%;">Product Description</th>
+          <th style="width: 20%;">Category</th>
+          <th style="width: 15%; text-align: right;">Price</th>
+          <th style="width: 8%; text-align: center;">Qty</th>
+          <th style="width: 12%; text-align: right;">Total Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${p.products.map(item => `
+          <tr>
+            <td><span class="product-name">${item.name}</span></td>
+            <td><span class="category">${item.category}</span></td>
+            <td style="text-align: right;"><span class="price">₹${item.price.toLocaleString("en-IN")}</span></td>
+            <td style="text-align: center;"><span class="qty">${item.quantity}</span></td>
+            <td style="text-align: right;"><span class="amount">₹${(item.price * item.quantity).toLocaleString("en-IN")}</span></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+
+    <div class="summary-section">
+      <table class="summary-table">
+        <tr>
+          <td>Subtotal before tax:</td>
+          <td class="amount-val">₹${subtotal.toLocaleString("en-IN")}</td>
+        </tr>
+        <tr>
+          <td>integrated GST (18%):</td>
+          <td class="amount-val">₹${gstVal.toLocaleString("en-IN")}</td>
+        </tr>
+        <tr class="total-row">
+          <td>GRAND TOTAL RECEIVED:</td>
+          <td class="total-val text-right">₹${p.totalAmount.toLocaleString("en-IN")}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="footer">
+      <p>Thank you for purchasing. AR Supermarket digital checkout software terminal (2026).</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const dlAnchorElem = document.createElement("a");
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `supermarket_invoice_${p.id}.json`);
+    dlAnchorElem.setAttribute("href", url);
+    dlAnchorElem.setAttribute("download", `supermarket_bill_${p.id}.html`);
     dlAnchorElem.click();
-    addToast("Invoice structure downloaded successfully", "success");
+    URL.revokeObjectURL(url);
+    addToast("Invoice document downloaded successfully as printable HTML", "success");
   };
 
   const handleInvoiceSelect = (p: Purchase) => {
@@ -349,11 +648,11 @@ export default function AdminPurchases() {
             {/* Print control */}
             <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex gap-3">
               <button
-                onClick={() => downloadJSONInvoice(selectedInvoice)}
-                className="flex-1 py-3 border border-slate-250 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 transition"
+                onClick={() => downloadHTMLInvoice(selectedInvoice)}
+                className="flex-1 py-3 border border-emerald-250 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-slate-800 text-xs font-bold text-emerald-700 dark:text-emerald-400 rounded-xl flex items-center justify-center gap-2 transition"
               >
                 <Download className="h-4 w-4" />
-                Download JSON Invoice
+                Download Bill (HTML)
               </button>
               <button
                 onClick={() => handlePrint(selectedInvoice)}

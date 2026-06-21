@@ -1,5 +1,4 @@
 import { MongoClient } from "mongodb";
-import { MongoMemoryServer } from "mongodb-memory-server";
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const DB_NAME = "billing_system";
@@ -7,26 +6,6 @@ const DB_NAME = "billing_system";
 let mongoClient: any = null;
 let isConnected = false;
 let lastError: string | null = null;
-let localMongoServer: any = null;
-let isSpunUpAttempted = false;
-
-// Initialize background MongoDB Memory Server to fulfill localhost connection on container
-async function ensureLocalMongoServer() {
-  if (isSpunUpAttempted) return;
-  isSpunUpAttempted = true;
-  try {
-    console.log("Starting AR Supermarket inline background MongoDB database daemon...");
-    localMongoServer = await MongoMemoryServer.create({
-      instance: {
-        port: 27017,
-        dbName: DB_NAME
-      }
-    });
-    console.log("AR Supermarket local in-memory MongoDB is fully spun up on localhost:27017!");
-  } catch (err: any) {
-    console.warn("Could not start inline local MongoMemoryServer, falling back to fully-persistent Virtual MongoDB Client layer:", err.message);
-  }
-}
 
 // Custom Virtual Mock Client fallback for robust, 100% active state connectivity
 class MockCollection {
@@ -77,16 +56,15 @@ export async function getMongoClient(): Promise<any> {
 
   const hasConfiguredURI = !!process.env.MONGODB_URI;
 
-  // In production, if NO MongoDB URI is configured, immediately jump to the local virtual simulator
-  if (process.env.NODE_ENV === "production" && !hasConfiguredURI) {
+  if (!hasConfiguredURI) {
     mongoClient = new MockMongoClient();
     isConnected = true;
     lastError = null;
-    console.log("[PRODUCTION] No MONGODB_URI configured. Entering Virtualized Local MongoDB Persistence Mode.");
+    console.log("No MONGODB_URI configured. Entering Virtualized Local MongoDB Persistence Mode.");
     return mongoClient;
   }
 
-  // First Tier: Attempt to connect to requested MONGODB_URI
+  // Attempt to connect to requested MONGODB_URI
   try {
     const client = new MongoClient(MONGODB_URI, {
       serverSelectionTimeoutMS: 500, // Very fast check to not block app load
@@ -99,36 +77,12 @@ export async function getMongoClient(): Promise<any> {
     console.log(`Successfully connected to external MongoDB Instance: ${MONGODB_URI}`);
     return client;
   } catch (error: any) {
-    // In production, we don't attempt to spin up heavy local memory binary servers which could crash Cloud Run, we go straight to Tier 3 fallback
-    if (process.env.NODE_ENV === "production") {
-      mongoClient = new MockMongoClient();
-      isConnected = true;
-      lastError = null;
-      console.log("[PRODUCTION] Database connection failed. Falling back instantly to Virtualized Local MongoDB Persistence Engine (Tier 3 fallback) to avoid application freeze.");
-      return mongoClient;
-    }
-
-    // Second Tier (Development only): Startup & Connect to background MongoMemoryServer
-    try {
-      await ensureLocalMongoServer();
-      const client = new MongoClient("mongodb://127.0.0.1:27017/billing_system", {
-        serverSelectionTimeoutMS: 1000,
-        connectTimeoutMS: 1000,
-      });
-      await client.connect();
-      mongoClient = client;
-      isConnected = true;
-      lastError = null;
-      console.log("Successfully bridged connection with local in-memory MongoDB Server!");
-      return client;
-    } catch (innerErr: any) {
-      // Third Tier: Fallback to high-performance Virtual Persisted Core Client
-      mongoClient = new MockMongoClient();
-      isConnected = true; // Set to true to show always CONNECTED and active
-      lastError = null;
-      console.log("Successfully connected to Virtuallized Local MongoDB Persistence Engine (Tier 3 fallback).");
-      return mongoClient;
-    }
+    // Database connection failed. Falling back instantly to Virtualized Local MongoDB Persistence Engine fallback
+    mongoClient = new MockMongoClient();
+    isConnected = true;
+    lastError = null;
+    console.log("Database connection failed. Falling back instantly to Virtualized Local MongoDB Persistence Engine to avoid application freeze.");
+    return mongoClient;
   }
 }
 
