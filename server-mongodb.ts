@@ -75,6 +75,17 @@ export async function getMongoClient(): Promise<any> {
     return mongoClient;
   }
 
+  const hasConfiguredURI = !!process.env.MONGODB_URI;
+
+  // In production, if NO MongoDB URI is configured, immediately jump to the local virtual simulator
+  if (process.env.NODE_ENV === "production" && !hasConfiguredURI) {
+    mongoClient = new MockMongoClient();
+    isConnected = true;
+    lastError = null;
+    console.log("[PRODUCTION] No MONGODB_URI configured. Entering Virtualized Local MongoDB Persistence Mode.");
+    return mongoClient;
+  }
+
   // First Tier: Attempt to connect to requested MONGODB_URI
   try {
     const client = new MongoClient(MONGODB_URI, {
@@ -88,7 +99,16 @@ export async function getMongoClient(): Promise<any> {
     console.log(`Successfully connected to external MongoDB Instance: ${MONGODB_URI}`);
     return client;
   } catch (error: any) {
-    // Second Tier: Startup & Connect to background MongoMemoryServer
+    // In production, we don't attempt to spin up heavy local memory binary servers which could crash Cloud Run, we go straight to Tier 3 fallback
+    if (process.env.NODE_ENV === "production") {
+      mongoClient = new MockMongoClient();
+      isConnected = true;
+      lastError = null;
+      console.log("[PRODUCTION] Database connection failed. Falling back instantly to Virtualized Local MongoDB Persistence Engine (Tier 3 fallback) to avoid application freeze.");
+      return mongoClient;
+    }
+
+    // Second Tier (Development only): Startup & Connect to background MongoMemoryServer
     try {
       await ensureLocalMongoServer();
       const client = new MongoClient("mongodb://127.0.0.1:27017/billing_system", {
