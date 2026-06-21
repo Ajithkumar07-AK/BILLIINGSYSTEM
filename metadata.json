@@ -1,0 +1,6 @@
+{
+  "name": "Supermarket Billing Management System",
+  "description": "A comprehensive and responsive Supermarket Billing Management System with role-based access control, analytics dashboard, inventory product catalog, billing engine, and pdf download options.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
