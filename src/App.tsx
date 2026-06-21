@@ -46,7 +46,10 @@ function SystemGateway() {
     register,
     toasts,
     removeToast,
-    addToast
+    addToast,
+    pendingOtp,
+    verifyOtp,
+    cancelOtp
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState<string>("dashboard");
@@ -70,6 +73,10 @@ function SystemGateway() {
   const [showSignUpPassword, setShowSignUpPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
+  // OTP Verification Form Fields State
+  const [typedOtp, setTypedOtp] = useState<string>("");
+  const [otpVerifying, setOtpVerifying] = useState<boolean>(false);
+
   // Database Connection Status Panel State
   const [showDemoCredentials, setShowDemoCredentials] = useState<boolean>(false);
   const [dbStatus, setDbStatus] = useState<{
@@ -90,37 +97,56 @@ function SystemGateway() {
     return () => clearInterval(interval);
   }, [user]);
 
+  // Set default active tab automatically whenever the user role is logged in/changed
+  React.useEffect(() => {
+    if (user) {
+      setActiveTab(user.role === "admin" ? "dashboard" : "purchase_products");
+    }
+  }, [user?.role]);
+
+  const handleOtpVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typedOtp.length !== 6) {
+      addToast("Verification key must be exactly 6 digits", "warning");
+      return;
+    }
+    setOtpVerifying(true);
+    const success = await verifyOtp(typedOtp);
+    setOtpVerifying(false);
+    if (success) {
+      setTypedOtp("");
+    }
+  };
+
+  const handleCancelOtp = () => {
+    cancelOtp();
+    setTypedOtp("");
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authEmail.trim() || !authPassword) {
       addToast("Please provide both email and password parameters", "warning");
       return;
     }
-    const success = await login(authEmail.trim(), authPassword);
-    if (success) {
-      // Set active default tab depending on role
-      setActiveTab(userLoginRole === "admin" ? "dashboard" : "purchase_products");
-    }
+    await login(authEmail.trim(), authPassword);
   };
 
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (signUpPassword !== confirmPassword) {
-      addToast("Password conformations do not match", "warning");
+      addToast("Password confirmations do not match", "warning");
       return;
     }
 
-    const success = await register({
+    await register({
       name: fullName,
       email: signUpEmail,
       mobile: signUpMobile,
       password: signUpPassword,
-      confirmPassword
+      confirmPassword,
+      role: userLoginRole // Register with selected role (customer vs admin)
     });
-
-    if (success) {
-      setActiveTab("purchase_products");
-    }
   };
 
   // Switch login role selection cleanly without pre-filling any dummy details
@@ -140,9 +166,9 @@ function SystemGateway() {
         {/* Header toolbar */}
         <header className="h-16 flex items-center justify-between px-6 border-b border-slate-150 dark:border-slate-850 bg-white dark:bg-slate-900 shadow-xs">
           <div className="flex items-center gap-2">
-            <div className="bg-emerald-600 text-white px-2 py-1 rounded-lg font-bold text-md">₹</div>
+            <div className="bg-emerald-600 text-white px-2 py-1 rounded-lg font-bold text-md">AR</div>
             <span className="font-extrabold tracking-wide text-xs uppercase text-slate-800 dark:text-white">
-              Supermarket Terminal
+              AR Supermarket Billing System
             </span>
           </div>
           <button
@@ -158,250 +184,347 @@ function SystemGateway() {
         <main className="flex-1 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 max-w-md w-full rounded-3xl p-6 md:p-8 shadow-xl space-y-6">
             
-            {/* Toggle login vs signup */}
-            <div className="text-center pb-4">
-              <h2 className="text-xl font-black text-slate-900 dark:text-white">
-                {isSignUp ? "Create Supermarket Profile" : "Supermarket Login"}
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                {isSignUp ? "Sign up as a customer to purchase items" : "Access your supermarket account ledger"}
-              </p>
-            </div>
+            {pendingOtp ? (
+              // OTP VERIFICATION VIEW
+              <div className="space-y-6">
+                <div className="text-center pb-2">
+                  <h2 className="text-xl font-black text-rose-600 dark:text-rose-400 flex items-center justify-center gap-2">
+                    <Lock className="h-5 w-5 animate-pulse" />
+                    <span>One-Time Password (OTP)</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    A 6-digit security code has been sent to confirm your email: <br/>
+                    <strong className="text-slate-705 dark:text-slate-305 font-mono font-bold text-sm block mt-1 break-all bg-slate-55 dark:bg-slate-850 p-2 rounded-lg">{pendingOtp.email}</strong>
+                  </p>
+                </div>
 
-            {/* If login, show tab switcher (Customer vs Admin) */}
-            {!isSignUp && (
-              <div className="flex bg-slate-100 dark:bg-slate-850 p-1 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => selectLoginRole("customer")}
-                  className={`flex-1 py-2 text-xs font-bold leading-none rounded-lg transition ${
-                    userLoginRole === "customer"
-                      ? "bg-white text-slate-905 dark:bg-slate-800 dark:text-white shadow-xs"
-                      : "text-slate-400 hover:text-slate-600"
-                  }`}
-                >
-                  Customer Login
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectLoginRole("admin")}
-                  className={`flex-1 py-2 text-xs font-bold leading-none rounded-lg transition ${
-                    userLoginRole === "admin"
-                      ? "bg-white text-slate-905 dark:bg-slate-800 dark:text-white shadow-xs"
-                      : "text-slate-400 hover:text-slate-600"
-                  }`}
-                >
-                  Admin Manager Login
-                </button>
-              </div>
-            )}
+                {/* Visual Sandbox Assistance */}
+                <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-250/65 dark:border-amber-900/60 rounded-2xl p-4 md:p-5 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs text-amber-800 dark:text-amber-400">
+                      <Mail className="h-4 w-4 text-amber-500 animate-pulse" />
+                      <span>SMTP Sandbox Helper</span>
+                    </div>
+                    <span className="text-[9px] bg-amber-100 dark:bg-amber-900/45 text-amber-700 dark:text-amber-300 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Sandbox Active
+                    </span>
+                  </div>
+                  
+                  <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                    If you haven't configured Gmail credentials (<code className="font-mono text-[10px] bg-amber-150/40 dark:bg-amber-950/60 px-1 py-0.5 rounded font-bold">EMAIL_USER</code> / <code className="font-mono text-[10px] bg-amber-150/40 dark:bg-amber-950/60 px-1 py-0.5 rounded font-bold">EMAIL_PASS</code>) in your settings, real email delivery is simulated. 
+                    Your bypass OTP validation code is:
+                  </p>
 
-            {/* Main forms selection */}
-            {isSignUp ? (
-              // SIGN UP FORM
-              <form onSubmit={handleSignUpSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Your Full Name *
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-3 h-4.5 w-4.5 text-slate-400" />
+                  <div 
+                    onClick={() => {
+                      setTypedOtp(pendingOtp.otpSimulated);
+                      addToast("Security code auto-filled!", "success");
+                    }}
+                    className="group relative font-mono bg-white dark:bg-slate-905 hover:bg-emerald-50 dark:hover:bg-slate-800 py-3 px-4 rounded-xl text-center font-black text-lg tracking-widest cursor-pointer border border-dashed border-amber-300 dark:border-amber-800 hover:border-emerald-505 dark:hover:border-emerald-400 transition-all flex items-center justify-center gap-2"
+                    title="Click to auto-fill OTP code"
+                  >
+                    <span className="text-rose-500 group-hover:text-emerald-500 transition-colors font-extrabold text-xl">
+                      {pendingOtp.otpSimulated}
+                    </span>
+                    <span className="text-[9px] text-slate-400 font-normal tracking-normal absolute right-3 opacity-0 group-hover:opacity-100 transition-all">
+                      Click to fill
+                    </span>
+                  </div>
+
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-normal italic text-center">
+                    💡 Click the box above to automatically insert this 6-digit code!
+                  </p>
+                </div>
+
+                <form onSubmit={handleOtpVerifySubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center">
+                      6-Digit Security Code *
+                    </label>
                     <input
                       type="text"
+                      maxLength={6}
+                      pattern="\d{6}"
                       required
-                      placeholder="e.g. Ramesh Kanna"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="e.g. 123456"
+                      value={typedOtp}
+                      onChange={(e) => setTypedOtp(e.target.value.replace(/[^0-9]/g, ''))}
+                      className="w-full text-center py-3 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-2xl font-mono font-black tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-white"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Email address *
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. rameshkanna0901@gmail.com"
-                      value={signUpEmail}
-                      onChange={(e) => setSignUpEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Mobile Number (+91 India 10-digits) *
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4.5 w-4.5 text-slate-400" />
-                    <input
-                      type="tel"
-                      required
-                      pattern="\d{10}"
-                      placeholder="e.g. 9123456789"
-                      value={signUpMobile}
-                      onChange={(e) => setSignUpMobile(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Password *
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                      <input
-                        type={showSignUpPassword ? "text" : "password"}
-                        required
-                        minLength={6}
-                        placeholder="••••••"
-                        value={signUpPassword}
-                        onChange={(e) => setSignUpPassword(e.target.value)}
-                        className="w-full pl-9 pr-10 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowSignUpPassword(!showSignUpPassword)}
-                        className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
-                        title={showSignUpPassword ? "Hide password" : "Show password"}
-                      >
-                        {showSignUpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Confirm *
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        required
-                        placeholder="••••••"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full pl-9 pr-10 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
-                        title={showConfirmPassword ? "Hide password" : "Show password"}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition uppercase tracking-wider mt-2 cursor-pointer"
-                >
-                  Create Profile & Login
-                </button>
-              </form>
-            ) : (
-              // SIGN IN FORM
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Email address
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. employee@supermarket.com"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Password details
-                  </label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                    <input
-                      type={showAuthPassword ? "text" : "password"}
-                      required
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      className="w-full pl-9 pr-10 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
                     <button
                       type="button"
-                      onClick={() => setShowAuthPassword(!showAuthPassword)}
-                      className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
-                      title={showAuthPassword ? "Hide password" : "Show password"}
+                      onClick={handleCancelOtp}
+                      className="py-3 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-505 dark:text-slate-405 rounded-xl text-xs font-bold transition uppercase tracking-wider cursor-pointer"
                     >
-                      {showAuthPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={otpVerifying || typedOtp.length !== 6}
+                      className="py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-sm transition uppercase tracking-wider cursor-pointer"
+                    >
+                      {otpVerifying ? "Verifying..." : "Confirm & Enter →"}
                     </button>
                   </div>
+                </form>
+              </div>
+            ) : (
+              // NORMAL SIGNUP AND SIGNIN FORMS FLOW
+              <>
+                {/* Toggle login vs signup */}
+                <div className="text-center pb-2">
+                  <h2 className="text-xl font-black text-slate-900 dark:text-white">
+                    {isSignUp ? "Create AR Supermarket Profile" : "AR Supermarket Login"}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {isSignUp 
+                      ? userLoginRole === "admin" 
+                        ? "Register a new administrator manager profile" 
+                        : "Sign up as a customer to purchase items"
+                      : userLoginRole === "admin"
+                        ? "Access the administrative terminal metrics"
+                        : "Access your customer purchase ledger"
+                    }
+                  </p>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition uppercase tracking-wider outline-none mt-2 cursor-pointer"
-                >
-                  Verify Credentials & Enter →
-                </button>
-              </form>
-            )}
+                {/* Always show tab switcher (Customer vs Admin) so they can create/access any role in real-time */}
+                <div className="flex bg-slate-100 dark:bg-slate-850 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => selectLoginRole("customer")}
+                    className={`flex-1 py-2 text-xs font-bold leading-none rounded-lg transition ${
+                      userLoginRole === "customer"
+                        ? "bg-white text-slate-900 dark:bg-slate-800 dark:text-white shadow-xs"
+                        : "text-slate-500 hover:text-slate-700 dark:text-slate-400"
+                    }`}
+                  >
+                    {isSignUp ? "Customer Signup" : "Customer Login"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectLoginRole("admin")}
+                    className={`flex-1 py-2 text-xs font-bold leading-none rounded-lg transition ${
+                      userLoginRole === "admin"
+                        ? "bg-white text-slate-900 dark:bg-slate-800 dark:text-white shadow-xs"
+                        : "text-slate-400 hover:text-slate-600 dark:text-slate-500"
+                    }`}
+                  >
+                    {isSignUp ? "Admin Signup" : "Admin Manager Login"}
+                  </button>
+                </div>
 
-            {/* Bottom swap trigger */}
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center text-xs">
-              {isSignUp ? (
-                <p className="text-slate-500">
-                  Already have a supermarket account?{" "}
-                  <button
-                    onClick={() => setIsSignUp(false)}
-                    className="font-bold text-emerald-600 dark:text-emerald-400 underline hover:opacity-80"
-                  >
-                    Login here
-                  </button>
-                </p>
-              ) : (
-                <p className="text-slate-500">
-                  New to our supermarket?{" "}
-                  <button
-                    onClick={() => {
-                      setIsSignUp(true);
-                      setFullName("");
-                      setSignUpEmail("");
-                      setSignUpMobile("");
-                      setSignUpPassword("");
-                      setConfirmPassword("");
-                    }}
-                    className="font-bold text-emerald-600 dark:text-emerald-400 underline hover:opacity-80"
-                  >
-                    Create customer store account
-                  </button>
-                </p>
-              )}
-            </div>
+                {/* Main forms selection */}
+                {isSignUp ? (
+                  // SIGN UP FORM
+                  <form onSubmit={handleSignUpSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Your Full Name *
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4.5 w-4.5 text-slate-400" />
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Ramesh Kanna"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Email address *
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4.5 w-4.5 text-slate-400" />
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. rameshkanna0901@gmail.com"
+                          value={signUpEmail}
+                          onChange={(e) => setSignUpEmail(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Mobile Number (+91 India 10-digits) *
+                      </label>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-3 h-4.5 w-4.5 text-slate-400" />
+                        <input
+                          type="tel"
+                          required
+                          pattern="\d{10}"
+                          placeholder="e.g. 9123456789"
+                          value={signUpMobile}
+                          onChange={(e) => setSignUpMobile(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Password *
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                          <input
+                            type={showSignUpPassword ? "text" : "password"}
+                            required
+                            minLength={6}
+                            placeholder="••••••"
+                            value={signUpPassword}
+                            onChange={(e) => setSignUpPassword(e.target.value)}
+                            className="w-full pl-9 pr-10 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                            className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
+                            title={showSignUpPassword ? "Hide password" : "Show password"}
+                          >
+                            {showSignUpPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Confirm *
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            required
+                            placeholder="••••••"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full pl-9 pr-10 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
+                            title={showConfirmPassword ? "Hide password" : "Show password"}
+                          >
+                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition uppercase tracking-wider mt-2 cursor-pointer"
+                    >
+                      Create Profile & Login
+                    </button>
+                  </form>
+                ) : (
+                  // SIGN IN FORM
+                  <form onSubmit={handleLoginSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        {userLoginRole === "admin" ? "Admin email address *" : "Customer email address *"}
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                        <input
+                          type="email"
+                          required
+                          placeholder={userLoginRole === "admin" ? "admin@supermarket.com" : "e.g. customer@gmail.com"}
+                          value={authEmail}
+                          onChange={(e) => setAuthEmail(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Password details *
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                        <input
+                          type={showAuthPassword ? "text" : "password"}
+                          required
+                          placeholder="••••••••"
+                          value={authPassword}
+                          onChange={(e) => setAuthPassword(e.target.value)}
+                          className="w-full pl-9 pr-10 py-2.5 border border-slate-205 dark:border-slate-705 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAuthPassword(!showAuthPassword)}
+                          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer focus:outline-none"
+                          title={showAuthPassword ? "Hide password" : "Show password"}
+                        >
+                          {showAuthPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition uppercase tracking-wider outline-none mt-2 cursor-pointer"
+                    >
+                      Verify Credentials & Enter →
+                    </button>
+                  </form>
+                )}
+
+                {/* Bottom swap trigger */}
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-center text-xs">
+                  {isSignUp ? (
+                    <p className="text-slate-500">
+                      Already have an AR Supermarket account?{" "}
+                      <button
+                        onClick={() => setIsSignUp(false)}
+                        className="font-bold text-emerald-600 dark:text-emerald-400 underline hover:opacity-80 cursor-pointer"
+                      >
+                        Login here
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="text-slate-500">
+                      New to AR Supermarket?{" "}
+                      <button
+                        onClick={() => {
+                          setIsSignUp(true);
+                          setFullName("");
+                          setSignUpEmail("");
+                          setSignUpMobile("");
+                          setSignUpPassword("");
+                          setConfirmPassword("");
+                        }}
+                        className="font-bold text-emerald-600 dark:text-emerald-400 underline hover:opacity-80 cursor-pointer"
+                      >
+                        Create customer store account
+                      </button>
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </main>
 
         <footer className="py-6 border-t border-slate-100 dark:border-slate-900 bg-white dark:bg-slate-900/50 text-center space-y-2 text-[10px] text-slate-400 font-mono">
-          <div>Supermarket Indian Billing Engine Terminal v3.4.0 (2026)</div>
+          <div>AR Supermarket Indian Billing Engine Terminal v3.4.0 (2026)</div>
           {dbStatus && (
             <div className="flex items-center justify-center gap-1.5 md:gap-4 flex-wrap max-w-2xl mx-auto px-4 pt-1">
               <span className="flex items-center gap-1.5">

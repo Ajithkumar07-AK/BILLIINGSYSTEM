@@ -13,6 +13,7 @@
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.1.14",
+    "@types/nodemailer": "^8.0.1",
     "@vitejs/plugin-react": "^5.0.4",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
@@ -20,7 +21,9 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
     "mongodb": "^7.3.0",
+    "mongodb-memory-server": "^11.2.0",
     "motion": "^12.23.24",
+    "nodemailer": "^9.0.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "recharts": "^3.8.1",

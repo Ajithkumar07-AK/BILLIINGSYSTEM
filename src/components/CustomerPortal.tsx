@@ -195,8 +195,9 @@ export default function CustomerPortal({ defaultTab = "profile" }: { defaultTab?
       } else {
         addToast(data.error || "Checkout transaction rejected", "error");
       }
-    } catch (e) {
-      addToast("Network or server connection issue", "error");
+    } catch (e: any) {
+      console.error("Checkout transaction error:", e);
+      addToast(`Checkout failed: ${e?.message || "Connection issue"}`, "error");
     }
   };
 
@@ -230,7 +231,7 @@ export default function CustomerPortal({ defaultTab = "profile" }: { defaultTab?
         </head>
         <body>
           <div class="header-info">
-            <h1 class="title">🏪 SUPERMARKET INDIA LTD.</h1>
+            <h1 class="title">🏪 AR SUPERMARKET INDIA LTD.</h1>
             <p style="margin: 3px 0 0; font-size: 11px;">Connaught Place Plaza, New Delhi - 110001</p>
           </div>
 
@@ -246,7 +247,7 @@ export default function CustomerPortal({ defaultTab = "profile" }: { defaultTab?
                 <strong>INVOICE REFERENCE:</strong><br/>
                 Invoice ID: #${invoice.id}<br/>
                 Date: ${invoice.purchaseDate}<br/>
-              </td>
+                </td>
             </tr>
           </table>
 
@@ -289,7 +290,7 @@ export default function CustomerPortal({ defaultTab = "profile" }: { defaultTab?
           </table>
 
           <div class="footer-claim">
-            <p>Thank you for purchasing. Supermarket digital checkout software terminal (2026).</p>
+            <p>Thank you for purchasing. AR Supermarket digital checkout software terminal (2026).</p>
           </div>
           <script>window.onload = function() { window.print(); }</script>
         </body>
@@ -552,7 +553,7 @@ export default function CustomerPortal({ defaultTab = "profile" }: { defaultTab?
             {cart.length === 0 ? (
               <div className="text-center py-12 space-y-3">
                 <p className="text-sm font-medium text-slate-400">Your basket items list is empty.</p>
-                <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Add supermarket products from catalog grids to initialize purchase billing.</p>
+                <p className="text-[11px] text-slate-400 leading-relaxed font-medium">Add AR Supermarket products from catalog grids to initialize purchase billing.</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -698,7 +699,7 @@ export default function CustomerPortal({ defaultTab = "profile" }: { defaultTab?
 
             <div className="text-center py-4 border-b border-dashed border-slate-205 dark:border-slate-705">
               <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-xl mb-3 font-extrabold">🔔</div>
-              <h3 className="text-md font-bold text-slate-900 dark:text-white">India Supermarket Invoices generated!</h3>
+              <h3 className="text-md font-bold text-slate-900 dark:text-white">AR Supermarket Invoice generated!</h3>
               <p className="text-slate-400 mt-1 font-medium">Invoice Reference Number: <span className="font-mono text-emerald-600 font-bold">#{recentInvoice.id}</span></p>
             </div>
 

@@ -115,7 +115,7 @@ export default function AdminReports() {
     const htmlContent = `
       <html>
         <head>
-          <title>Supermarket Strategic Executive Report</title>
+          <title>AR Supermarket Strategic Executive Report</title>
           <style>
             body { font-family: system-ui, sans-serif; color: #1e293b; padding: 40px; }
             .header { text-align: center; border-bottom: 3px solid #10b981; padding-bottom: 20px; margin-bottom: 40px; }
@@ -132,7 +132,7 @@ export default function AdminReports() {
         </head>
         <body>
           <div class="header">
-            <h1 class="title">🏦 Supermarket Executives Business Report</h1>
+            <h1 class="title">🏦 AR Supermarket Executives Business Report</h1>
             <p class="meta">Corporate Billing ledger report - generated on: ${todayDate}</p>
             <p class="meta">Active filter: <strong>${dateFilter.toUpperCase().replace("_", " ")}</strong></p>
           </div>
@@ -173,7 +173,7 @@ export default function AdminReports() {
           </table>
 
           <div class="footer">
-            <p>© 2569 Supermarket India Logistics - Confidential Store Reports</p>
+            <p>© 2569 AR Supermarket India Logistics - Confidential Store Reports</p>
           </div>
           <script>window.print();</script>
         </body>
@@ -270,7 +270,7 @@ export default function AdminReports() {
           <h4 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
             {totalProductsSoldValue} Units
           </h4>
-          <p className="text-[10px] text-slate-400 mt-2 font-medium">Supermarket products delivered</p>
+          <p className="text-[10px] text-slate-400 mt-2 font-medium">AR Supermarket products delivered</p>
         </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl relative overflow-hidden">
           <span className="text-xs text-slate-400 font-bold block mb-1 uppercase tracking-wider">Total Revenue Generated</span>

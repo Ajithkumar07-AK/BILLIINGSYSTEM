@@ -77,8 +77,9 @@ export default function AdminProducts() {
         const err = await res.json();
         addToast(err.error || "Failed to delete product", "error");
       }
-    } catch (e) {
-      addToast("Network action failed", "error");
+    } catch (e: any) {
+      console.error("Product deletion error:", e);
+      addToast(`Action failed: ${e?.message || "Network issue"}`, "error");
     }
   };
 
@@ -166,10 +167,10 @@ export default function AdminProducts() {
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Package className="h-5 w-5 text-emerald-600" />
-            Supermarket Catalog Inventory
+            AR Supermarket Catalog Inventory
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Control supermarket pricing, categorizations, and restock levels. We support direct catalog editing.
+            Control AR Supermarket pricing, categorizations, and restock levels. We support direct catalog editing.
           </p>
         </div>
         <button
@@ -219,7 +220,7 @@ export default function AdminProducts() {
       {/* Grid displays */}
       {filteredProducts.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl">
-          <p className="text-sm font-medium text-slate-400">No supermarket products found matching selected constraints.</p>
+          <p className="text-sm font-medium text-slate-400">No AR Supermarket products found matching selected constraints.</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
@@ -311,7 +312,7 @@ export default function AdminProducts() {
 
             <h3 className="text-lg font-bold text-slate-900 dark:text-white pb-2 flex items-center gap-2">
               <Package className="h-5 w-5 text-emerald-600" />
-              {editingProduct ? "Update Catalog Listing" : "Register Supermarket SKU"}
+              {editingProduct ? "Update Catalog Listing" : "Register AR Supermarket SKU"}
             </h3>
             <p className="text-xs text-slate-400 mb-6">
               Fill standard item metrics below. Users will select this product directly from catalog list.

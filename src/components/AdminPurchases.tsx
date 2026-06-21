@@ -47,7 +47,7 @@ export default function AdminPurchases() {
     const htmlContent = `
       <html>
         <head>
-          <title>Supermarket Invoice - ${p.id}</title>
+          <title>AR Supermarket Invoice - ${p.id}</title>
           <style>
             body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; padding: 40px; line-height: 1.5; }
             .header { text-align: center; border-bottom: 2px solid #e1e8ed; padding-bottom: 20px; margin-bottom: 30px; }
@@ -67,7 +67,7 @@ export default function AdminPurchases() {
         </head>
         <body>
           <div class="header">
-            <h1 class="store-title">🏪 Supermarket India Ltd.</h1>
+            <h1 class="store-title">🏪 AR Supermarket India Ltd.</h1>
             <p class="store-sub">Corporate Hub Plaza, Connaught Place, New Delhi - 110001</p>
           </div>
           
@@ -128,7 +128,7 @@ export default function AdminPurchases() {
 
           <div class="footer">
             <p>Thank you for shopping with us! This is a digitally initialized legal tax invoice representation.</p>
-            <p>Supermarket Billing System Terminal (2026)</p>
+            <p>AR Supermarket Billing System Terminal (2026)</p>
           </div>
           <script>
             window.onload = function() { window.print(); }
@@ -283,7 +283,7 @@ export default function AdminPurchases() {
             <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs">
               <div className="text-center pb-4 border-b border-dashed border-slate-200 dark:border-slate-700">
                 <h4 className="text-lg font-bold tracking-wider uppercase text-slate-800 dark:text-white">
-                  Supermarket India Ltd.
+                  AR Supermarket India Ltd.
                 </h4>
                 <p className="text-slate-400 mt-1">Connaught Place Central Hub, New Delhi</p>
                 <p className="text-slate-500 font-mono text-[10px] mt-0.5">GSTIN: 07AAAXXXXXXXXXXZZ</p>

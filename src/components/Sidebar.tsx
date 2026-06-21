@@ -76,8 +76,8 @@ export default function Sidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: 
                 ₹
               </div>
               <div>
-                <h1 className="text-sm font-semibold tracking-tight text-slate-800 dark:text-white uppercase">
-                  SuperMarket
+                <h1 className="text-sm font-black tracking-tight text-slate-800 dark:text-white uppercase">
+                  AR Supermarket
                 </h1>
                 <p className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                   Billing & Analytics

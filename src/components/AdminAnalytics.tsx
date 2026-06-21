@@ -131,7 +131,7 @@ export default function AdminAnalytics() {
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-3xl shadow-xs space-y-4">
           <div className="flex items-center gap-2">
             <ShoppingBag className="h-4 w-4 text-amber-500" />
-            <h3 className="text-sm font-bold text-slate-850 dark:text-white">Most Sold Supermarket items (Units)</h3>
+            <h3 className="text-sm font-bold text-slate-850 dark:text-white">Most Sold AR Supermarket items (Units)</h3>
           </div>
 
           <div className="h-72 w-full">

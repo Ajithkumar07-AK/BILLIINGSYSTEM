@@ -17,6 +17,9 @@ interface AuthContextType {
   removeToast: (id: string) => void;
   saveCustomerDetails: (details: { name: string; email: string; mobile: string }) => void;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<any>;
+  pendingOtp: { email: string; action: "login" | "register"; otpSimulated: string } | null;
+  verifyOtp: (otp: string) => Promise<boolean>;
+  cancelOtp: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,6 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [customerDetails, setCustomerDetails] = useState<{ name: string; email: string; mobile: string } | null>(null);
+  const [pendingOtp, setPendingOtp] = useState<{ email: string; action: "login" | "register"; otpSimulated: string } | null>(null);
 
   useEffect(() => {
     // Restore session
@@ -84,6 +88,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      if (data.otpRequired) {
+        setPendingOtp({
+          email: data.email,
+          action: "login",
+          otpSimulated: data.otpSimulated
+        });
+        addToast("Security verification code generated!", "info");
+        return true;
+      }
+
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem("sb_token", data.token);
@@ -98,8 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       addToast(`Welcome back, ${data.user.name}!`, "success");
       return true;
-    } catch (e) {
-      addToast("Network connection error", "error");
+    } catch (e: any) {
+      console.error("Login unexpected error:", e);
+      addToast(`Login error: ${e?.message || "Unknown error"}`, "error");
       return false;
     }
   };
@@ -117,6 +132,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      if (data.otpRequired) {
+        setPendingOtp({
+          email: data.email,
+          action: "register",
+          otpSimulated: data.otpSimulated
+        });
+        addToast("Security verification code generated!", "info");
+        return true;
+      }
+
       setToken(data.token);
       setUser(data.user);
       localStorage.setItem("sb_token", data.token);
@@ -128,16 +153,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       addToast("Account created successfully!", "success");
       return true;
-    } catch (e) {
-      addToast("Network connection error", "error");
+    } catch (e: any) {
+      console.error("Registration unexpected error:", e);
+      addToast(`Registration error: ${e?.message || "Unknown error"}`, "error");
       return false;
     }
+  };
+
+  const verifyOtp = async (otpCode: string): Promise<boolean> => {
+    if (!pendingOtp) return false;
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: pendingOtp.email,
+          otp: otpCode,
+          action: pendingOtp.action
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error || "Incorrect validation key code", "error");
+        return false;
+      }
+
+      setToken(data.token);
+      setUser(data.user);
+      localStorage.setItem("sb_token", data.token);
+      localStorage.setItem("sb_user", JSON.stringify(data.user));
+
+      if (data.user?.role === "customer") {
+        const details = { name: data.user.name, email: data.user.email, mobile: data.user.mobile };
+        setCustomerDetails(details);
+        localStorage.setItem("sb_customer", JSON.stringify(details));
+      }
+
+      setPendingOtp(null);
+      addToast(data.message || "Identity verified!", "success");
+      return true;
+    } catch (e: any) {
+      console.error("OTP verification unexpected error:", e);
+      addToast(`Verification error: ${e?.message || "Unknown error"}`, "error");
+      return false;
+    }
+  };
+
+  const cancelOtp = () => {
+    setPendingOtp(null);
+    addToast("OTP authentication cancelled", "info");
   };
 
   const logout = () => {
     setToken(null);
     setUser(null);
     setCustomerDetails(null);
+    setPendingOtp(null);
     localStorage.removeItem("sb_token");
     localStorage.removeItem("sb_user");
     localStorage.removeItem("sb_customer");
@@ -182,7 +253,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         addToast,
         removeToast,
         saveCustomerDetails,
-        fetchWithAuth
+        fetchWithAuth,
+        pendingOtp,
+        verifyOtp,
+        cancelOtp
       }}
     >
       {children}

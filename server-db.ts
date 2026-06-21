@@ -57,11 +57,21 @@ export class DBStore {
       try {
         const fileContent = fs.readFileSync(DB_FILE, "utf-8");
         this.data = JSON.parse(fileContent);
+
+        // Remove any historical default seed purchases starting with tx_0 or tx_ to ensure clean user-only revenue calculation
+        if (this.data.purchases) {
+          this.data.purchases = this.data.purchases.filter(p => !p.id.startsWith("tx_0"));
+        }
+        if (this.data.visitors) {
+          this.data.visitors = this.data.visitors.filter(v => !v.id.startsWith("v_") || v.id.length > 6);
+        }
+
         // Guarantee default products exist if deleted or array empty
         if (!this.data.products || this.data.products.length === 0) {
           this.data.products = [...DEFAULT_PRODUCTS];
           this.save();
         }
+        this.save();
         return;
       } catch (e) {
         console.error("Error reading database file, resetting...", e);
@@ -131,13 +141,8 @@ export class DBStore {
       visitors: []
     };
 
-    // Seed recent Purchase Histories is highly valuable for Analytics and charts
-    this.seedPurchases();
-    // Seed visitor history
-    this.seedVisitors();
-
     this.save();
-    console.log("Database initialized and seeded successfully at " + DB_FILE);
+    console.log("Database initialized cleanly without default sample sales at " + DB_FILE);
   }
 
   private static seedPurchases() {
@@ -333,6 +338,14 @@ export class DBStore {
     return newUser;
   }
 
+  static deleteUserByEmail(email: string): boolean {
+    const initialLen = this.data.users.length;
+    this.data.users = this.data.users.filter(u => u.email.toLowerCase() !== email.toLowerCase());
+    const deleted = this.data.users.length < initialLen;
+    if (deleted) this.save();
+    return deleted;
+  }
+
   static getProducts(): Product[] {
     return this.data.products;
   }
@@ -373,6 +386,25 @@ export class DBStore {
     this.data.customers.push(newCustomer);
     this.save();
     return newCustomer;
+  }
+
+  static updateCustomer(id: string, updated: Partial<Customer>): boolean {
+    const custIndex = this.data.customers.findIndex(c => c.id === id);
+    if (custIndex === -1) return false;
+    this.data.customers[custIndex] = {
+      ...this.data.customers[custIndex],
+      ...updated
+    };
+    this.save();
+    return true;
+  }
+
+  static deleteCustomer(id: string): boolean {
+    const initialLen = this.data.customers.length;
+    this.data.customers = this.data.customers.filter(c => c.id !== id);
+    const deleted = this.data.customers.length < initialLen;
+    if (deleted) this.save();
+    return deleted;
   }
 
   static getPurchases(): Purchase[] {

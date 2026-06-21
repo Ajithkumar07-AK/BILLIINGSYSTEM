@@ -188,10 +188,10 @@ export default function AdminDashboard() {
       <div className="bg-emerald-800 text-white rounded-3xl p-6 md:p-8 flex items-center justify-between gap-6 relative overflow-hidden shadow-lg shadow-emerald-900/10">
         <div className="relative z-10 max-w-xl">
           <span className="bg-emerald-700/60 text-emerald-200 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border border-emerald-600">
-            India Hub Store
+            AR Store Hub
           </span>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-3">
-            Supermarket Admin Terminal
+            AR Supermarket Admin Terminal
           </h2>
           <p className="mt-2 text-sm text-emerald-100 leading-relaxed">
             Monitor real-time sales transactions, inspect digital invoice logs, track user sign-ins, and generate graphical reports instantly.
@@ -341,7 +341,7 @@ export default function AdminDashboard() {
 
       {/* Quick Category Summary Cards */}
       <div className="bg-slate-50 dark:bg-slate-800/20 p-6 rounded-3xl border border-slate-100 dark:border-slate-800/60">
-        <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4">India Supermarket Catalog Stock Status Alert</h3>
+        <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-4">AR Supermarket Catalog Stock Status Alert</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {[
             { cat: "Groceries", color: "border-emerald-500 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200" },

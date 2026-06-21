@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Users, Search, Phone, Mail, Calendar, Clock, Download } from "lucide-react";
+import { Users, Search, Phone, Mail, Calendar, Clock, Download, Edit2, Trash2, X } from "lucide-react";
 
 export default function AdminCustomers() {
   const { fetchWithAuth, addToast } = useAuth();
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [editingCustomer, setEditingCustomer] = useState<any | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -22,6 +23,54 @@ export default function AdminCustomers() {
       addToast("Failed to load customer profiles", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+    try {
+      const res = await fetchWithAuth(`/api/customers/${editingCustomer.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editingCustomer.name,
+          email: editingCustomer.email,
+          mobile: editingCustomer.mobile,
+          date: editingCustomer.date,
+          time: editingCustomer.time
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addToast(data.message || "Customer info updated successfully", "success");
+        setEditingCustomer(null);
+        loadCustomers();
+      } else {
+        addToast(data.error || "Update failed", "error");
+      }
+    } catch (err: any) {
+      addToast(err?.message || "An error occurred", "error");
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to permanently delete the customer profile: "${name}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetchWithAuth(`/api/customers/${id}`, {
+        method: "DELETE"
+      });
+      const data = await res.json();
+      if (res.ok) {
+        addToast(data.message || "Customer profile deleted successfully", "success");
+        loadCustomers();
+      } else {
+        addToast(data.error || "Failed to delete customer", "error");
+      }
+    } catch (err: any) {
+      addToast(err?.message || "An error occurred", "error");
     }
   };
 
@@ -89,7 +138,7 @@ export default function AdminCustomers() {
       {/* Control Panel */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search by full name, email address, or mobile..."
@@ -113,7 +162,7 @@ export default function AdminCustomers() {
           {filteredCustomers.map((cust) => (
             <div
               key={cust.id}
-              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs hover:shadow-md transition duration-200 hover:-translate-y-0.5"
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs hover:shadow-md transition duration-200"
             >
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 flex items-center justify-center font-bold text-lg">
@@ -145,8 +194,132 @@ export default function AdminCustomers() {
                   <span>Time Checked: {cust.time}</span>
                 </div>
               </div>
+
+              {/* Action Buttons */}
+              <div className="mt-5 pt-4 border-t border-slate-105 dark:border-slate-805 flex gap-2">
+                <button
+                  onClick={() => setEditingCustomer(cust)}
+                  className="flex-1 py-1.5 cursor-pointer text-center border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
+                >
+                  <Edit2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => handleDelete(cust.id, cust.name)}
+                  className="px-3 py-1.5 cursor-pointer text-center border border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 rounded-xl transition flex items-center justify-center"
+                  title="Delete Customer Profile"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Edit Overlay Modal */}
+      {editingCustomer && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-900 border border-slate-205 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                Update Customer Ledger Account
+              </h3>
+              <button
+                onClick={() => setEditingCustomer(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Customer's Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  value={editingCustomer.name}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  value={editingCustomer.email}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  10-Digit Mobile Number
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={10}
+                  pattern="^\d{10}$"
+                  title="10-digit mobile number"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  value={editingCustomer.mobile}
+                  onChange={(e) => setEditingCustomer({ ...editingCustomer, mobile: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Date Checked
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    value={editingCustomer.date}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    Time Checked
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    value={editingCustomer.time}
+                    onChange={(e) => setEditingCustomer({ ...editingCustomer, time: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setEditingCustomer(null)}
+                  className="flex-1 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-500 rounded-xl font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-sm transition cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

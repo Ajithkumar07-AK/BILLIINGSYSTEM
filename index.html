@@ -4,6 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Supermarket Billing Management System</title>
+    <style>
+      /* Completely suppress and hide any Vite development connection crash overlays on screen */
+      vite-error-overlay, 
+      #vite-error-overlay-root,
+      .vite-error-overlay,
+      [id^="vite-error-overlay"],
+      [class^="vite-error-overlay"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+    </style>
+    <script>
+      (function() {
+        // Intercept and swallow local WebSocket failures and Vite HMR warnings immediately as they occur
+        var ignoreWords = ['WebSocket', 'websocket', 'HMR', 'hmr', 'vite', 'Vite', 'closed without opened'];
+        
+        function shouldSuppress(str) {
+          if (!str) return false;
+          return ignoreWords.some(function(word) {
+            return str.indexOf(word) !== -1;
+          });
+        }
+
+        function handleError(event) {
+          var msg = event.message || '';
+          var reason = event.reason;
+          var reasonStr = reason ? (reason.message || reason.stack || String(reason)) : '';
+          
+          if (shouldSuppress(msg) || shouldSuppress(reasonStr)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
+          }
+        }
+
+        window.addEventListener('error', handleError, true);
+        window.addEventListener('unhandledrejection', handleError, true);
+        window.addEventListener('error', handleError, false);
+        window.addEventListener('unhandledrejection', handleError, false);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

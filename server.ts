@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
 import { createServer as createViteServer } from "vite";
 import { DBStore } from "./server-db";
 import { User, Product, Customer, Purchase, Visitor, UserRole } from "./src/types";
@@ -12,6 +13,7 @@ import {
   seedUsersToMongo,
   saveProductToMongo,
   saveCustomerToMongo,
+  deleteCustomerFromMongo,
   saveVisitorToMongo,
   savePurchaseToMongo,
   seedInitialStoreToMongo
@@ -19,6 +21,73 @@ import {
 
 // Initialize the Database Store
 DBStore.initialize();
+
+// Helper function to send real OTP verification code via Gmail SMTP if configured
+async function sendOTPEmail(email: string, otp: string, purpose: "login" | "register") {
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+
+  if (!emailUser || !emailPass) {
+    console.log(`[OTP SYSTEM] Gmail SMTP is not configured in .env. Falling back to sandbox simulation.`);
+    console.log(`[OTP SYSTEM] GENERATED CODE FOR ${email.toUpperCase()} (${purpose.toUpperCase()}): ${otp}`);
+    return { sent: false, error: "SMTP credentials not configured" };
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: emailUser,
+        pass: emailPass
+      }
+    });
+
+    const subject = purpose === "login" 
+      ? "🔐 Login Verification Code - AR Supermarket" 
+      : "🌟 Registration Verification Code - AR Supermarket";
+
+    const mailOptions = {
+      from: `"AR Supermarket Billing System" <${emailUser}>`,
+      to: email.toLowerCase(),
+      subject: subject,
+      html: `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 20px; background-color: #ffffff; color: #1e293b; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <div style="font-size: 24px; font-weight: 800; color: #10b981; letter-spacing: -0.5px;">AR Supermarket Billing System</div>
+            <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-top: 4px; font-weight: 700;">Secure Identity Gatekeeper</div>
+          </div>
+          
+          <div style="border-top: 2px solid #f1f5f9; padding-top: 24px;">
+            <p style="font-size: 15px; line-height: 1.6; color: #334155;">Hello,</p>
+            <p style="font-size: 15px; line-height: 1.6; color: #334155;">You requested a security verification code to sign into or register your AR Supermarket customer profile.</p>
+            
+            <div style="margin: 28px 0; text-align: center;">
+              <p style="font-size: 11px; font-weight: 755; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 10px;">Verification Code (${purpose})</p>
+              <div style="display: inline-block; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 40px; font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #ef4444;">${otp}</div>
+            </div>
+
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+              This code is valid for <strong>5 minutes</strong>. If you did not make this request, you can safely disregard this email.
+            </p>
+          </div>
+
+          <div style="margin-top: 32px; border-top: 1px solid #f1f5f9; padding-top: 20px; font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.5;">
+            <p>This is an automated system email. Do not reply to this message.</p>
+            <p style="margin-top: 4px;">&copy; 2026 AR Supermarket. All rights reserved.</p>
+          </div>
+        </div>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[OTP SYSTEM] Real verification email successfully sent to ${email}. ID: ${info.messageId}`);
+    return { sent: true };
+  } catch (err: any) {
+    console.error(`[OTP SYSTEM] Failed to send real SMTP verification email to ${email}:`, err.message);
+    return { sent: false, error: err.message };
+  }
+}
+
 
 // Seed database users & catalogs to MongoDB billing_system asynchronously if database is online
 seedUsersToMongo(DBStore.getUsers()).catch((err) => {
@@ -94,11 +163,20 @@ function requireAdmin(req: any, res: any, next: any) {
   next();
 }
 
+// OTP Store for Ordinary Customers (Security Layer)
+interface PendingOTP {
+  email: string;
+  otp: string;
+  expiresAt: number;
+  userData?: any; // For registration
+}
+const pendingOTPs = new Map<string, PendingOTP>();
+
 // API Routes
 
 // Registration
-app.post("/api/auth/register", (req, res) => {
-  const { name, email, mobile, password, confirmPassword } = req.body;
+app.post("/api/auth/register", async (req, res) => {
+  const { name, email, mobile, password, confirmPassword, role } = req.body;
 
   if (!name || !email || !mobile || !password || !confirmPassword) {
     return res.status(400).json({ error: "All fields are required" });
@@ -128,13 +206,15 @@ app.post("/api/auth/register", (req, res) => {
   const salt = bcrypt.genSaltSync(10);
   const passwordHash = bcrypt.hashSync(password, salt);
 
+  const finalRole = (role === "admin" || role === "customer") ? role : "customer";
+
   // Create User
   const newUser = DBStore.createUser({
     name,
     email: email.toLowerCase(),
     mobile,
     password: passwordHash,
-    role: "customer"
+    role: finalRole
   });
 
   // Store user registration details asynchronously in MongoDB (billing_system.users and billing_system.anime)
@@ -147,26 +227,39 @@ app.post("/api/auth/register", (req, res) => {
     role: newUser.role
   }).catch((err) => console.error("MongoDB write warning during registration:", err.message));
 
-  // Automatically Create Customer Card
-  const todayVal = getIndiaDate();
-  const timeVal = getIndiaTime();
-  const newCust = DBStore.createCustomer({
-    name,
-    email: email.toLowerCase(),
-    mobile,
-    date: todayVal,
-    time: timeVal
-  });
+  if (finalRole === "customer") {
+    // Create Customer profile card
+    const todayVal = getIndiaDate();
+    const timeVal = getIndiaTime();
+    const newCust = DBStore.createCustomer({
+      name,
+      email: email.toLowerCase(),
+      mobile,
+      date: todayVal,
+      time: timeVal
+    });
 
-  // Automatically create a Visitor login record for history
-  DBStore.createVisitor({
-    customerId: newCust.id,
-    name: newCust.name,
-    email: newCust.email,
-    mobile: newCust.mobile,
-    loginTime: timeVal,
-    visitDate: todayVal
-  });
+    // Create Visitor log record
+    DBStore.createVisitor({
+      customerId: newCust.id,
+      name: newCust.name,
+      email: newCust.email,
+      mobile: newCust.mobile,
+      loginTime: timeVal,
+      visitDate: todayVal
+    });
+
+    // Ensure they both sync to local in-memory DB and MongoDB properly
+    saveCustomerToMongo(newCust).catch((err) => console.warn("MongoDB customer sync warning:", err.message));
+    saveVisitorToMongo({
+      customerId: newCust.id,
+      name: newCust.name,
+      email: newCust.email,
+      mobile: newCust.mobile,
+      loginTime: timeVal,
+      visitDate: todayVal
+    }).catch((err) => console.warn("MongoDB visitor sync warning:", err.message));
+  }
 
   // Generate Token
   const token = jwt.sign(
@@ -189,7 +282,7 @@ app.post("/api/auth/register", (req, res) => {
 });
 
 // Login (Both Admin and User/Customer)
-app.post("/api/auth/login", (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -224,20 +317,19 @@ app.post("/api/auth/login", (req, res) => {
     return res.status(400).json({ error: "Invalid email or password" });
   }
 
-  // Record successful login details in MongoDB billing_system (collections login_logs and anime)
-  logLoginToMongo({
-    email: user.email.toLowerCase(),
-    role: user.role,
-    success: true,
-    time: getIndiaTime(),
-    date: getIndiaDate()
-  }).catch((err) => console.warn("MongoDB connection offline. Login log skipped:", err.message));
-
-  // If role is customer, dynamically log them as a Visitor
-  const todayVal = getIndiaDate();
-  const timeVal = getIndiaTime();
   if (user.role === "customer") {
-    // Find if customer card already exists, or create one
+    // Record login in MongoDB
+    logLoginToMongo({
+      email: user.email.toLowerCase(),
+      role: user.role,
+      success: true,
+      time: getIndiaTime(),
+      date: getIndiaDate()
+    }).catch((err) => console.warn("MongoDB connection offline. Login log skipped:", err.message));
+
+    // Sync Customer and create Visitor trace
+    const todayVal = getIndiaDate();
+    const timeVal = getIndiaTime();
     let targetCust = DBStore.getCustomers().find(c => c.email.toLowerCase() === user.email.toLowerCase());
     if (!targetCust) {
       targetCust = DBStore.createCustomer({
@@ -250,8 +342,8 @@ app.post("/api/auth/login", (req, res) => {
       saveCustomerToMongo(targetCust).catch((err) => console.warn("MongoDB customer sync warning:", err.message));
     }
 
-    // Add visitor record
-    const visitor = DBStore.createVisitor({
+    // Add Visitor Trace in system
+    DBStore.createVisitor({
       customerId: targetCust.id,
       name: user.name,
       email: user.email,
@@ -259,10 +351,26 @@ app.post("/api/auth/login", (req, res) => {
       loginTime: timeVal,
       visitDate: todayVal
     });
-    saveVisitorToMongo(visitor).catch((err) => console.warn("MongoDB visitor sync warning:", err.message));
+    saveVisitorToMongo({
+      customerId: targetCust.id,
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      loginTime: timeVal,
+      visitDate: todayVal
+    }).catch((err) => console.warn("MongoDB visitor sync warning:", err.message));
+  } else {
+    // Record login for non-customer
+    logLoginToMongo({
+      email: user.email.toLowerCase(),
+      role: user.role,
+      success: true,
+      time: getIndiaTime(),
+      date: getIndiaDate()
+    }).catch((err) => console.warn("MongoDB connection offline. Login log skipped:", err.message));
   }
 
-  // Generate JWT Token
+  // Generate Token
   const token = jwt.sign(
     { id: user.id, name: user.name, email: user.email, mobile: user.mobile, role: user.role },
     JWT_SECRET,
@@ -280,6 +388,166 @@ app.post("/api/auth/login", (req, res) => {
       role: user.role
     }
   });
+});
+
+// Verify Email OTP for Users/Customers (Kept for compatibility, returns immediate success block if called)
+app.post("/api/auth/verify-otp", (req, res) => {
+  const { email, otp, action } = req.body;
+
+  if (!email || !otp || !action) {
+    return res.status(400).json({ error: "Email, OTP code, and action fields are required" });
+  }
+
+  const record = pendingOTPs.get(email.toLowerCase());
+  if (!record || record.otp !== otp || record.expiresAt < Date.now()) {
+    return res.status(400).json({ error: "Invalid, incorrect, or expired OTP code" });
+  }
+
+  // Clean up OTP on success
+  pendingOTPs.delete(email.toLowerCase());
+
+  if (action === "register") {
+    const { name, email: lowerEmail, mobile, passwordHash, finalRole } = record.userData;
+
+    // Create User
+    const newUser = DBStore.createUser({
+      name,
+      email: lowerEmail,
+      mobile,
+      password: passwordHash,
+      role: finalRole
+    });
+
+    // Store user registration details asynchronously in MongoDB
+    saveUserToMongo({
+      id: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      mobile: newUser.mobile,
+      password: newUser.password,
+      role: newUser.role
+    }).catch((err) => console.error("MongoDB write warning during registration:", err.message));
+
+    // Create Customer profile card
+    const todayVal = getIndiaDate();
+    const timeVal = getIndiaTime();
+    const newCust = DBStore.createCustomer({
+      name,
+      email: lowerEmail,
+      mobile,
+      date: todayVal,
+      time: timeVal
+    });
+
+    // Create Visitor log record
+    DBStore.createVisitor({
+      customerId: newCust.id,
+      name: newCust.name,
+      email: newCust.email,
+      mobile: newCust.mobile,
+      loginTime: timeVal,
+      visitDate: todayVal
+    });
+
+    // Ensure they both sync to local in-memory DB and MongoDB properly
+    saveCustomerToMongo(newCust).catch((err) => console.warn("MongoDB customer sync warning:", err.message));
+    saveVisitorToMongo({
+      customerId: newCust.id,
+      name: newCust.name,
+      email: newCust.email,
+      mobile: newCust.mobile,
+      loginTime: timeVal,
+      visitDate: todayVal
+    }).catch((err) => console.warn("MongoDB visitor sync warning:", err.message));
+
+    // Generate Token
+    const token = jwt.sign(
+      { id: newUser.id, name: newUser.name, email: newUser.email, mobile: newUser.mobile, role: newUser.role },
+      JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+
+    return res.status(201).json({
+      message: "Registration completed successfully!",
+      token,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        mobile: newUser.mobile,
+        role: newUser.role
+      }
+    });
+
+  } else if (action === "login") {
+    const user = DBStore.findUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: "Associated user profile no longer exists" });
+    }
+
+    // Record login in MongoDB
+    logLoginToMongo({
+      email: user.email.toLowerCase(),
+      role: user.role,
+      success: true,
+      time: getIndiaTime(),
+      date: getIndiaDate()
+    }).catch((err) => console.warn("MongoDB connection offline. Login log skipped:", err.message));
+
+    // Sync Customer and create Visitor trace
+    const todayVal = getIndiaDate();
+    const timeVal = getIndiaTime();
+    let targetCust = DBStore.getCustomers().find(c => c.email.toLowerCase() === user.email.toLowerCase());
+    if (!targetCust) {
+      targetCust = DBStore.createCustomer({
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        date: todayVal,
+        time: timeVal
+      });
+      saveCustomerToMongo(targetCust).catch((err) => console.warn("MongoDB customer sync warning:", err.message));
+    }
+
+    // Add Visitor Trace in system
+    DBStore.createVisitor({
+      customerId: targetCust.id,
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      loginTime: timeVal,
+      visitDate: todayVal
+    });
+    saveVisitorToMongo({
+      customerId: targetCust.id,
+      name: user.name,
+      email: user.email,
+      mobile: user.mobile,
+      loginTime: timeVal,
+      visitDate: todayVal
+    }).catch((err) => console.warn("MongoDB visitor sync warning:", err.message));
+
+    // Generate token
+    const token = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, mobile: user.mobile, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+
+    return res.status(200).json({
+      message: "Authentication completed successfully!",
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role
+      }
+    });
+  }
+
+  return res.status(400).json({ error: "Unsupported verification scope action" });
 });
 
 // GET database and MongoDB status info
@@ -397,6 +665,53 @@ app.post("/api/customer/profile", authenticateToken, (req, res) => {
 // Retrieve Customers List (Admin only)
 app.get("/api/customers", authenticateToken, requireAdmin, (req, res) => {
   return res.json(DBStore.getCustomers());
+});
+
+// Update Customer Details (Admin only)
+app.put("/api/customers/:id", authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { name, email, mobile, date, time } = req.body;
+
+  if (!name || !email || !mobile) {
+    return res.status(400).json({ error: "Name, email and mobile are required" });
+  }
+
+  const updated = DBStore.updateCustomer(id, { name, email, mobile, date, time });
+  if (!updated) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+
+  return res.json({ message: "Customer details updated successfully" });
+});
+
+// Delete Customer (Admin only)
+app.delete("/api/customers/:id", authenticateToken, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  
+  const customer = DBStore.getCustomers().find(c => c.id === id);
+  if (!customer) {
+    return res.status(404).json({ error: "Customer profile not found" });
+  }
+
+  const email = customer.email;
+
+  // 1. Delete customer ledger profile from local memory/JSON persistence
+  const deleted = DBStore.deleteCustomer(id);
+  if (!deleted) {
+    return res.status(404).json({ error: "Customer profile not found" });
+  }
+
+  // 2. Delete matching User login profile from local memory/JSON to keep accounts in sync
+  if (email) {
+    DBStore.deleteUserByEmail(email);
+  }
+
+  // 3. Delete from MongoDB to fully ensure they are wiped out from account details lists
+  deleteCustomerFromMongo(id, email).catch((err) => {
+    console.warn("MongoDB customer deletion sync warning:", err.message);
+  });
+
+  return res.json({ message: "Customer profile and login credentials deleted successfully" });
 });
 
 // Purchase Management
@@ -679,8 +994,8 @@ app.get("/api/dashboard/analytics", authenticateToken, requireAdmin, (req, res) 
     { month: "Feb", revenue: 0 },
     { month: "Mar", revenue: 0 },
     { month: "Apr", revenue: 0 },
-    { month: "May", revenue: 5000 }, // pre-fill some nice trends
-    { month: "Jun", revenue: 12000 }
+    { month: "May", revenue: 0 },
+    { month: "Jun", revenue: 0 }
   ];
   purchases.forEach(p => {
     const dateParts = p.purchaseDate.split("-");
