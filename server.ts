@@ -3,7 +3,7 @@ import path from "path";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
-import { createServer as createViteServer } from "vite";
+// Vite is dynamically imported only for local dev (not bundled on Vercel)
 import { DBStore } from "./server-db";
 import { User, Product, Customer, Purchase, Visitor, UserRole } from "./src/types";
 import {
@@ -1094,6 +1094,7 @@ app.get("/api/dashboard/analytics", authenticateToken, requireAdmin, (req, res) 
 // Setup Vite Dev Server / Static files handler
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa"
@@ -1112,4 +1113,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Start server locally; on Vercel, the app is exported as a serverless function
+if (process.env.VERCEL !== "1") {
+  startServer();
+}
+
+export default app;
