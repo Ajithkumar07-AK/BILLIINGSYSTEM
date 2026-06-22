@@ -19,8 +19,12 @@ import {
   seedInitialStoreToMongo
 } from "./server-mongodb";
 
-// Initialize the Database Store
-DBStore.initialize();
+// Initialize the Database Store (with fallback)
+try {
+  DBStore.initialize();
+} catch (e) {
+  console.error("Failed to initialize DB store, continuing with empty in-memory store:", (e as Error).message);
+}
 
 // Helper function to send real OTP verification code via Gmail SMTP if configured
 async function sendOTPEmail(email: string, otp: string, purpose: "login" | "register") {
