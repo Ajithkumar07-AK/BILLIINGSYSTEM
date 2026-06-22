@@ -1,16 +1,13 @@
-import express from "express";
-
-const app = express();
-
-app.get("/api/db/status", (_req: any, res: any) => {
-  res.json({
-    mongo: { status: "disconnected", uri: "not-configured", database: "billing_system", error: null },
-    local: { type: "In-Memory Store", filePath: "memory-only" }
+export default async function handler(req: any, res: any) {
+  const { VERCEL, MONGODB_URI, JWT_SECRET } = process.env;
+  return res.status(200).json({
+    status: "ok",
+    message: "Vercel function works!",
+    env: {
+      VERCEL: VERCEL || "not set",
+      hasMongoUri: MONGODB_URI ? "yes" : "no",
+      hasJwtSecret: JWT_SECRET ? "yes" : "no"
+    },
+    nodeVersion: process.version
   });
-});
-
-app.get("/api/test", (_req: any, res: any) => {
-  res.json({ status: "ok", message: "Vercel function is working!" });
-});
-
-export default app;
+}
