@@ -3,7 +3,10 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { User, Product, Customer, Purchase, Visitor, UserRole } from "./src/types";
 
-const DB_FILE = path.join(process.cwd(), "data", "supermarket_db.json");
+// Use /tmp on Vercel (read-write), otherwise the project data directory
+const DB_FILE = process.env.VERCEL === "1"
+  ? path.join("/tmp", "data", "supermarket_db.json")
+  : path.join(process.cwd(), "data", "supermarket_db.json");
 
 interface DBStructure {
   users: User[];
@@ -49,8 +52,12 @@ export class DBStore {
 
   static initialize() {
     const dir = path.dirname(DB_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } catch (e) {
+      console.warn("File system is read-only, running in memory-only mode:", (e as Error).message);
     }
 
     if (fs.existsSync(DB_FILE)) {
