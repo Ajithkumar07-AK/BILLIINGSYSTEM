@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 // Vite is dynamically imported only for local dev (not bundled on Vercel)
 import { DBStore } from "./server-db";
-import { User, Product, Customer, Purchase, Visitor, UserRole } from "./src/types";
+import type { User, Product, Customer, Purchase, Visitor, UserRole } from "./src/types";
 import {
   saveUserToMongo,
   logLoginToMongo,

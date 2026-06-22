@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
-import { User, Product, Customer, Purchase, Visitor, UserRole } from "./src/types";
+import type { User, Product, Customer, Purchase, Visitor, UserRole } from "./src/types";
 
 // Use /tmp on Vercel (read-write), otherwise the project data directory
 const DB_FILE = process.env.VERCEL === "1"
