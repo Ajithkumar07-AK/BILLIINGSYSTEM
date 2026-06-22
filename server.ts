@@ -1091,6 +1091,14 @@ app.get("/api/dashboard/analytics", authenticateToken, requireAdmin, (req, res) 
   });
 });
 
+// SPA fallback for production/Vercel: serve index.html for unmatched routes
+if (process.env.VERCEL === "1") {
+  const distPath = path.join(process.cwd(), "dist");
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
 // Setup Vite Dev Server / Static files handler
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
