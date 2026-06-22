@@ -1,8 +1,7 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
-import path from "path";
+
 import { DBStore } from "../server-db";
 import {
   saveUserToMongo,
